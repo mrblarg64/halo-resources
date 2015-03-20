@@ -69,8 +69,8 @@ openFile(GtkWidget *widget,gpointer window)
 loadData(gpointer window)
 {
 	int resourceIndex=0;
-	int pullData;
-	int charIndex;
+	//int pullData;
+	//int charIndex;
 	char dataName[250];
 	char oggHead[4]={'O','g','g','S'};
 
@@ -80,15 +80,16 @@ loadData(gpointer window)
 		dataIndex=&resourceMap[resourceMapHead->indexOffset+(resourceIndex*sizeof(struct resourceData))];
 		pullData=1;
 		charIndex=0;
-		while (pullData)
-		{
-			dataName[charIndex]=resourceMap[charIndex+(resourceMapHead->namesOffset+dataIndex->resourceName)];
-			if (dataName[charIndex]=='\0')
-			{
-				pullData=0;
-			}
-			charIndex++;
-		}
+		strcpy(&dataName,&resourceMap[(resourceMapHead->namesOffset+dataIndex->resourceName)]);
+		//while (pullData)
+		//{
+			//dataName[charIndex]=resourceMap[charIndex+(resourceMapHead->namesOffset+dataIndex->resourceName)];
+			//if (dataName[charIndex]=='\0')
+			//{
+				//pullData=0;
+			//}
+			//charIndex++;
+		//}
 		gtk_list_store_append(GTK_LIST_STORE(listStore),&iter);
 		gtk_list_store_set(listStore,&iter,0,resourceIndex,-1);
 		gtk_list_store_set(listStore,&iter,1,dataName,-1);
