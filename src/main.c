@@ -4,9 +4,6 @@
 #include <stdint.h>
 #include <stdlib.h>
 #include <string.h>
-#include <sndfile.h>
-#include <AL/al.h>
-#include <AL/alc.h>
 #include "structs.h"
 
 GtkWidget *resourceList;
@@ -44,7 +41,6 @@ openFile(GtkWidget *widget,gpointer window)
 		fseek(fp,0,SEEK_SET);
 		resourceMap=malloc(size);
 		fread(resourceMap,size,1,fp);
-		//memcpy(&soundMapHead,soundMap,sizeof(soundMapHead));
 		resourceMapHead=resourceMap;
 		if (resourceMapHead->dataType!=2&&resourceMapHead->dataType!=1)
 		{
@@ -69,8 +65,6 @@ openFile(GtkWidget *widget,gpointer window)
 loadData(gpointer window)
 {
 	int resourceIndex=0;
-	//int pullData;
-	//int charIndex;
 	char dataName[250];
 	char oggHead[4]={'O','g','g','S'};
 
@@ -78,18 +72,7 @@ loadData(gpointer window)
 	{
 		//memcpy(&dataIndex,&soundMap[soundMapHead.indexOffset+(resourceIndex*sizeof(dataIndex))],sizeof(dataIndex));
 		dataIndex=&resourceMap[resourceMapHead->indexOffset+(resourceIndex*sizeof(struct resourceData))];
-		pullData=1;
-		charIndex=0;
 		strcpy(&dataName,&resourceMap[(resourceMapHead->namesOffset+dataIndex->resourceName)]);
-		//while (pullData)
-		//{
-			//dataName[charIndex]=resourceMap[charIndex+(resourceMapHead->namesOffset+dataIndex->resourceName)];
-			//if (dataName[charIndex]=='\0')
-			//{
-				//pullData=0;
-			//}
-			//charIndex++;
-		//}
 		gtk_list_store_append(GTK_LIST_STORE(listStore),&iter);
 		gtk_list_store_set(listStore,&iter,0,resourceIndex,-1);
 		gtk_list_store_set(listStore,&iter,1,dataName,-1);
@@ -100,37 +83,6 @@ loadData(gpointer window)
 		resourceIndex++;
 	}
 }
-
-//playSingle(GtkWidget *widget,gpointer window)
-//{
-//	GtkWidget *playSingleDialog;
-//	short *pcmBuffer;
-//	char *rawInput;
-//	SNDFILE *sfp;
-//	SF_INFO soundInfo;
-//	SF_VIRTUAL_IO soundFileVirtual;
-//
-//	selection=gtk_tree_view_get_selection(GTK_TREE_VIEW(soundList));
-//	if (gtk_tree_selection_get_selected(selection,GTK_TREE_MODEL(&listStore),&iter))
-//	{
-//		int row;
-//		gtk_tree_model_get (GTK_TREE_MODEL(listStore),&iter,0,&row,-1);
-//		//g_print("%d\n",row);
-//		//g_free(row);//causes segfaults, leaking memory without?
-//		memcpy(&dataIndex,&soundMap[soundMapHead.indexOffset+(row*sizeof(dataIndex))],sizeof(dataIndex));
-//		rawInput=malloc(dataIndex.resourceSize);
-//		memcpy(rawInput,&soundMap[dataIndex.resourceDataOffset],dataIndex.resourceSize);
-//		//soundFileVirtual.get_filelen=dataIndex.resourceSize;
-//		//soundFileVirtual.seek=dataIndex.resourceDataOffset;
-//		sf_open_virtual(&soundFileVirtual,SFM_READ,&soundInfo,rawInput);
-//		g_print("%d format\n",soundInfo.format);
-//		//sfp=sf_open
-//		return;
-//	}
-//	playSingleDialog=gtk_message_dialog_new(GTK_WINDOW(window),GTK_DIALOG_DESTROY_WITH_PARENT,GTK_MESSAGE_INFO,GTK_BUTTONS_OK,"Nothing Selected!","Error");
-//	gtk_dialog_run(GTK_DIALOG(playSingleDialog));
-//	gtk_widget_destroy(playSingleDialog);
-//}
 
 exportSingleFile(GtkWidget *widget,gpointer window)
 {
