@@ -11,18 +11,26 @@ GtkListStore *listStore;
 GtkTreeIter iter;
 GtkTreeSelection *selection;
 
-int size=0;
+int fileLoaded=0;
+unsigned size=0;
 char *resourceMap;
 struct resourceHead *resourceMapHead;
 struct resourceData *dataIndex;
 
-openFile(GtkWidget *widget,gpointer window)
+void openFile(GtkWidget *widget,gpointer window)
 {
 	GtkWidget *openFileDialog;
 	FILE *fp=NULL;
 	int haveData=0;
 
-	openFileDialog=gtk_file_chooser_dialog_new("Select sounds.map or bitmaps.map?",window,GTK_FILE_CHOOSER_ACTION_OPEN,GTK_STOCK_CANCEL,GTK_RESPONSE_CANCEL,GTK_STOCK_OPEN,GTK_RESPONSE_ACCEPT,NULL);
+	if (fileLoaded)
+	{
+		openFileDialog=gtk_message_dialog_new(GTK_WINDOW(window),GTK_DIALOG_DESTROY_WITH_PARENT,GTK_MESSAGE_INFO,GTK_BUTTONS_OK,"Please unload the current file from memory, (this is not possible yet so just close the program)","Error");
+		gtk_dialog_run(GTK_DIALOG(openFileDialog));
+		gtk_widget_destroy(openFileDialog);
+		return;
+	}
+	openFileDialog=gtk_file_chooser_dialog_new("Select sounds.map or bitmaps.map",window,GTK_FILE_CHOOSER_ACTION_OPEN,GTK_STOCK_CANCEL,GTK_RESPONSE_CANCEL,GTK_STOCK_OPEN,GTK_RESPONSE_ACCEPT,NULL);
 	if (gtk_dialog_run(GTK_DIALOG(openFileDialog))==GTK_RESPONSE_ACCEPT)
 	{
 		char *infile;
@@ -62,7 +70,7 @@ openFile(GtkWidget *widget,gpointer window)
 	return;
 }
 
-loadData(gpointer window)
+void loadData(gpointer window)
 {
 	int resourceIndex=0;
 	char dataName[250];
@@ -72,7 +80,7 @@ loadData(gpointer window)
 	{
 		//memcpy(&dataIndex,&soundMap[soundMapHead.indexOffset+(resourceIndex*sizeof(dataIndex))],sizeof(dataIndex));
 		dataIndex=&resourceMap[resourceMapHead->indexOffset+(resourceIndex*sizeof(struct resourceData))];
-		strcpy(&dataName,&resourceMap[(resourceMapHead->namesOffset+dataIndex->resourceName)]);
+		g_strlcpy(&dataName,&resourceMap[(resourceMapHead->namesOffset+dataIndex->resourceName)],sizeof(dataName));
 		gtk_list_store_append(GTK_LIST_STORE(listStore),&iter);
 		gtk_list_store_set(listStore,&iter,0,resourceIndex,-1);
 		gtk_list_store_set(listStore,&iter,1,dataName,-1);
@@ -82,9 +90,10 @@ loadData(gpointer window)
 		}
 		resourceIndex++;
 	}
+	fileLoaded=1;
 }
 
-exportSingleFile(GtkWidget *widget,gpointer window)
+void exportSingleFile(GtkWidget *widget,gpointer window)
 {
 	GtkWidget *exportSingleFileDialog;
 	FILE *fp=NULL;
@@ -94,6 +103,8 @@ exportSingleFile(GtkWidget *widget,gpointer window)
 	{
 		int row;
 		gtk_tree_model_get (GTK_TREE_MODEL(listStore),&iter,0,&row,-1);
+//halp! i forgot what is going on here!!!!!!!!!!
+//halp!!
 		//g_print("%d\n",row);
 		//g_free(row);//causes segfaults, leaking memory without?
 		//memcpy(&dataIndex,&soundMap[soundMapHead.indexOffset+(row*sizeof(struct resourceData))],sizeof(dataIndex));
@@ -110,12 +121,13 @@ exportSingleFile(GtkWidget *widget,gpointer window)
 				exportSingleFileDialog=gtk_message_dialog_new(GTK_WINDOW(window),GTK_DIALOG_DESTROY_WITH_PARENT,GTK_MESSAGE_INFO,GTK_BUTTONS_OK,"File Write Error","Error");
 				gtk_dialog_run(GTK_DIALOG(exportSingleFileDialog));
 				gtk_widget_destroy(exportSingleFileDialog);
+				fclose(fp);
 				return;
 			}
 			fwrite(&resourceMap[dataIndex->resourceDataOffset],dataIndex->resourceSize,1,fp);
 			fclose(fp);
-			gtk_widget_destroy(exportSingleFileDialog);
 		}
+		gtk_widget_destroy(exportSingleFileDialog);
 		return;
 	}
 	exportSingleFileDialog=gtk_message_dialog_new(GTK_WINDOW(window),GTK_DIALOG_DESTROY_WITH_PARENT,GTK_MESSAGE_INFO,GTK_BUTTONS_OK,"Select a single resource to export","Error");
@@ -123,18 +135,18 @@ exportSingleFile(GtkWidget *widget,gpointer window)
 	gtk_widget_destroy(exportSingleFileDialog);
 }
 
-destroyAbout(GtkDialog *dialog)
+void destroyAbout(GtkDialog *dialog)
 {
 	gtk_widget_destroy(GTK_WIDGET(dialog));
 }
 
-aboutWindow(GtkWidget *widget,gpointer window)
+void aboutWindow(GtkWidget *widget,gpointer window)
 {
 	GtkWidget *haloResourceAbout;
 	const gchar *authors[]={"Brian Denton",NULL};
 
 	haloResourceAbout=gtk_about_dialog_new();
-	gtk_about_dialog_set_program_name(GTK_ABOUT_DIALOG(haloResourceAbout),"halo-resources 0.1");
+	gtk_about_dialog_set_program_name(GTK_ABOUT_DIALOG(haloResourceAbout),"halo-resources 0.2");
 	gtk_about_dialog_set_copyright(GTK_ABOUT_DIALOG(haloResourceAbout),"Copyright 2015 Brian Denton");
 	gtk_about_dialog_set_authors(GTK_ABOUT_DIALOG(haloResourceAbout),authors);
 	gtk_about_dialog_set_website_label(GTK_ABOUT_DIALOG(haloResourceAbout),"Project Page");
@@ -144,15 +156,56 @@ aboutWindow(GtkWidget *widget,gpointer window)
 	gtk_widget_show(haloResourceAbout);
 }
 
-main(int argc,char *argv[])
+void fileInfo(GtkWidget *widget,gpointer window)
 {
-	GtkWidget *window, *grid, *menuBar, *fileMenuButton, *fileMenu, *fileOpenButton, *fileExportButton, *fileQuitButton, *helpMenuButton, *helpMenu, *helpAboutButton,*searchBar, *scrollingWindow, *exportSingleButton;
+	GtkWidget *infoDialog;
+	char outputBuffer[512];
+
+	if (fileLoaded)
+	{
+		if (resourceMapHead->dataType==1)
+		{
+			g_snprintf(outputBuffer,sizeof(outputBuffer),"File size = %u bytes\nAmount of Tags = %u\nFile Type = bitmap",size,resourceMapHead->resourceCount);
+		}
+		if (resourceMapHead->dataType==2)
+		{
+			g_snprintf(outputBuffer,sizeof(outputBuffer),"File size = %u bytes\nAmount of Tags = %u\nFile Type = sound",size,resourceMapHead->resourceCount);
+		}
+		infoDialog=gtk_message_dialog_new(GTK_WINDOW(window),GTK_DIALOG_DESTROY_WITH_PARENT,GTK_MESSAGE_INFO,GTK_BUTTONS_OK,outputBuffer,"File Info");
+		gtk_dialog_run(GTK_DIALOG(infoDialog));
+		gtk_widget_destroy(infoDialog);
+		return;
+	}
+	infoDialog=gtk_message_dialog_new(GTK_WINDOW(window),GTK_DIALOG_DESTROY_WITH_PARENT,GTK_MESSAGE_INFO,GTK_BUTTONS_OK,"No file Loaded","Error");
+	gtk_dialog_run(GTK_DIALOG(infoDialog));
+	gtk_widget_destroy(infoDialog);
+}
+
+void closeFile(GtkWidget *widget,gpointer window)
+{
+	if (!fileLoaded)
+	{
+		return;
+	}
+	gtk_list_store_clear(listStore);
+	size=0;
+	//commented out FOR SPEED LIKE SANIC!
+	//serriously thought the "fileLoaded" bool will be checked instead of the validity of the pointers
+	//resourceMapHead=NULL;
+	//dataIndex=NULL;
+	free(resourceMap);
+	fileLoaded=0;
+}
+
+void main(int argc,char *argv[])
+{
+	GtkWidget *window, *grid, *menuBar, *fileMenuButton, *fileMenu, *fileOpenButton, *fileCloseButton, *fileExportButton, *fileQuitButton, *toolsMenuButton, *toolsMenu, *toolsInfoButton, *helpMenuButton, *helpMenu, *helpAboutButton,*searchBar, *scrollingWindow, *exportSingleButton;
 	GtkCellRenderer *renderer;
 	GtkTreeViewColumn *indexColumn, *tagColumn, *typeColumn;
 
 	gtk_init(&argc,&argv);
 	window=gtk_window_new(GTK_WINDOW_TOPLEVEL);
-	gtk_window_set_title(GTK_WINDOW(window),"halo-music");
+	gtk_window_set_title(GTK_WINDOW(window),"halo-resources");
 	gtk_window_set_default_size(GTK_WINDOW(window),1000,700);
 	grid=gtk_grid_new();
 	gtk_widget_set_hexpand(grid,TRUE);
@@ -172,8 +225,24 @@ main(int argc,char *argv[])
 	fileExportButton=gtk_menu_item_new_with_label("Export");
 	gtk_menu_shell_append(GTK_MENU_SHELL(fileMenu),fileExportButton);
 
+	fileCloseButton=gtk_menu_item_new_with_label("Close current map");
+	//set non-sensitive because no file is loaded
+	//gtk_widget_set_sensitive(fileCloseButton,FALSE);
+	gtk_menu_shell_append(GTK_MENU_SHELL(fileMenu),fileCloseButton);
+
 	fileQuitButton=gtk_menu_item_new_with_label("Quit");
 	gtk_menu_shell_append(GTK_MENU_SHELL(fileMenu),fileQuitButton);
+
+	toolsMenu=gtk_menu_new();
+
+	toolsMenuButton=gtk_menu_item_new_with_mnemonic("_Tools");
+	gtk_menu_item_set_submenu(GTK_MENU_ITEM(toolsMenuButton),toolsMenu);
+	gtk_menu_shell_append(GTK_MENU_SHELL(menuBar),toolsMenuButton);
+
+	toolsInfoButton=gtk_menu_item_new_with_label("File Info");
+	//set non-sensitive because no file is loaded
+	//gtk_widget_set_sensitive(toolsInfoButton,FALSE);
+	gtk_menu_shell_append(GTK_MENU_SHELL(toolsMenu),toolsInfoButton);
 
 	helpMenu=gtk_menu_new();
 
@@ -233,9 +302,11 @@ main(int argc,char *argv[])
 
 	g_signal_connect(window,"destroy",G_CALLBACK(gtk_main_quit),NULL);
 	g_signal_connect(fileQuitButton,"activate",G_CALLBACK(gtk_main_quit),NULL);
+	g_signal_connect(fileCloseButton,"activate",G_CALLBACK(closeFile),window);
 	g_signal_connect(fileOpenButton,"activate",G_CALLBACK(openFile),window);
 	g_signal_connect(exportSingleButton,"clicked",G_CALLBACK(exportSingleFile),window);
 	g_signal_connect(fileExportButton,"activate",G_CALLBACK(exportSingleFile),window);
+	g_signal_connect(toolsInfoButton,"activate",G_CALLBACK(fileInfo),window);
 	g_signal_connect(helpAboutButton,"activate",G_CALLBACK(aboutWindow),window);
 	gtk_main();
 }
